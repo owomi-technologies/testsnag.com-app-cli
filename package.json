@@ -1,0 +1,26 @@
+{
+  "name": "@testsnag/cli",
+  "version": "0.1.0",
+  "description": "Upload a mobile build, point tests at it, and run them.",
+  "type": "module",
+  "bin": {
+    "testsnag": "cli/testsnag.js"
+  },
+  "files": [
+    "cli",
+    "commands",
+    "prompts",
+    "util",
+    "config.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node cli/testsnag.js",
+    "test": "node --test test/*.test.js",
+    "format": "prettier --write ."
+  },
+  "license": "UNLICENSED"
+}

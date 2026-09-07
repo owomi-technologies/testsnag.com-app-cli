@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {mkdtemp, writeFile, mkdir} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+
+import {parseArgs, isInteractive} from '../util/args.js';
+import {discoverBuilds, formatSize, platformForFile, rejectionReason, describeBuild} from '../util/builds.js';
+import {assertPlatformMatches, assertTestsAreMobile, assertToken, assertMobileAllowance} from '../util/validate.js';
+
+test('flags parse into camelCase, and repeated tests collect into a list', () => {
+    const {command, flags} = parseArgs(['update', '--build', './a.apk', '--test', 'one', '--test', 'two,three', '--wait']);
+
+    assert.equal(command, 'update');
+    assert.equal(flags.build, './a.apk');
+    assert.deepEqual(flags.tests, ['one', 'two', 'three']);
+    assert.equal(flags.wait, true);
+});
+
+test('an inline flag value is accepted', () => {
+    const {flags} = parseArgs(['--url=https://example.test']);
+
+    assert.equal(flags.url, 'https://example.test');
+});
+
+test('json output forces non-interactive so CI never blocks on a prompt', () => {
+    assert.equal(isInteractive({json: true}), false);
+});
+
+test('platform is resolved from the extension', () => {
+    assert.equal(platformForFile('Acme.apk'), 'android');
+    assert.equal(platformForFile('Acme.apks'), 'android');
+    assert.equal(platformForFile('Acme.zip'), 'ios');
+    assert.equal(platformForFile('Acme.tar.gz'), 'ios');
+    assert.equal(platformForFile('Acme.ipa'), null);
+});
+
+test('an ipa is rejected with the command that produces a simulator build', () => {
+    assert.match(rejectionReason('Acme.ipa'), /iphonesimulator/);
+});
+
+test('an aab is rejected with the bundletool command', () => {
+    assert.match(rejectionReason('Acme.aab'), /bundletool/);
+});
+
+test('sizes read in units a person recognises', () => {
+    assert.equal(formatSize(300 * 1024 * 1024), '300MB');
+    assert.equal(formatSize(2 * 1024 ** 3), '2.0GB');
+});
+
+test('builds are discovered in the usual output directories, newest first', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'testsnag-cli-'));
+    await mkdir(join(root, 'android/app/build/outputs/apk'), {recursive: true});
+    await writeFile(join(root, 'Old.apk'), 'x');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await writeFile(join(root, 'android/app/build/outputs/apk/New.apk'), 'y');
+    await writeFile(join(root, 'notes.txt'), 'ignored');
+
+    const found = await discoverBuilds(root);
+
+    assert.equal(found.length, 2);
+    assert.equal(found[0].name, 'New.apk');
+    assert.equal(found[0].platform, 'android');
+});
+
+test('an empty build file is refused before anything is uploaded', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'testsnag-cli-'));
+    const path = join(root, 'Empty.apk');
+    await writeFile(path, '');
+
+    await assert.rejects(() => describeBuild(path), /is empty/);
+});
+
+test('a missing token names the command that fixes it', () => {
+    assert.throws(() => assertToken(null), /login/);
+});
+
+test('a non-mobile test is refused by name', () => {
+    assert.throws(() => assertTestsAreMobile([{name: 'Checkout', type: 'web'}]), /Checkout/);
+});
+
+test('a build cannot be bound to the other platform', () => {
+    assert.throws(() => assertPlatformMatches('android', [{name: 'iOS smoke', type: 'ios'}]), /iOS smoke/);
+});
+
+test('the allowance is checked before an upload, not after', async () => {
+    const exhausted = {me: async () => ({plan: 'pro', mobile_testing: true, mobile_minutes_used: 120, mobile_minutes_limit: 120})};
+
+    await assert.rejects(() => assertMobileAllowance(exhausted), /device minutes/);
+});
+
+test('a plan without mobile testing is refused with the plan named', async () => {
+    const basic = {me: async () => ({plan: 'starter', mobile_testing: false, mobile_minutes_used: 0, mobile_minutes_limit: 0})};
+
+    await assert.rejects(() => assertMobileAllowance(basic), /starter/);
+});
+
+test('an unlimited allowance passes', async () => {
+    const unlimited = {me: async () => ({plan: 'advance', mobile_testing: true, mobile_minutes_used: 999, mobile_minutes_limit: null})};
+
+    assert.equal((await assertMobileAllowance(unlimited)).plan, 'advance');
+});
