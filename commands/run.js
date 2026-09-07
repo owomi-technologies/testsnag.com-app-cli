@@ -5,23 +5,60 @@ import {emit, failure, info, muted, spinner, success, warn} from '../util/output
 const POLL_INTERVAL_MS = 3000;
 const TERMINAL = new Set(['passed', 'failed', 'cancelled', 'skipped']);
 
+function normalise(value) {
+    return String(value ?? '')
+        .trim()
+        .toLowerCase();
+}
+
+function closestNames(entry, tests) {
+    const needle = normalise(entry);
+
+    return tests
+        .filter((test) => normalise(test.name).includes(needle) || needle.includes(normalise(test.name)))
+        .map((test) => test.name)
+        .slice(0, 5);
+}
+
+export function resolveRequestedTests(requested, tests) {
+    const resolved = [];
+
+    for (const entry of requested) {
+        const byId = tests.filter((test) => test.uuid === entry);
+        const matches = byId.length > 0 ? byId : tests.filter((test) => normalise(test.name) === normalise(entry));
+
+        if (matches.length === 0) {
+            const suggestions = closestNames(entry, tests);
+
+            throw new Error(
+                `No test in this workspace matches "${entry}".` + (suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : ''),
+            );
+        }
+
+        if (matches.length > 1) {
+            throw new Error(
+                `"${entry}" matches ${matches.length} tests, so it is ambiguous. Use the id instead: ${matches.map((test) => test.uuid).join(', ')}.`,
+            );
+        }
+
+        if (!resolved.some((test) => test.uuid === matches[0].uuid)) {
+            resolved.push(matches[0]);
+        }
+    }
+
+    return resolved;
+}
+
 export async function chooseTests(client, {flags, interactive, type = null, message = 'Which tests?'}) {
     const requested = flags.tests ?? [];
     const {data} = await client.tests(type);
 
     if (requested.length > 0) {
-        const matched = data.filter((test) => requested.includes(test.uuid) || requested.includes(test.name));
-        const missing = requested.filter((entry) => !data.some((test) => test.uuid === entry || test.name === entry));
-
-        if (missing.length > 0) {
-            throw new Error(`No test in this workspace matches: ${missing.join(', ')}.`);
-        }
-
-        return matched;
+        return resolveRequestedTests(requested, data);
     }
 
     if (!interactive) {
-        throw new Error('Pass --test <uuid or name>. It can be repeated, or given as a comma separated list.');
+        throw new Error('Pass --test <id or name>. Repeat the flag once per test.');
     }
 
     if (data.length === 0) {

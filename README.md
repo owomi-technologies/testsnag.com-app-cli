@@ -28,15 +28,15 @@ Run with no command to pick interactively.
 
 ## Options
 
-| Flag                  | Meaning                                             |
-| --------------------- | --------------------------------------------------- |
-| `--test <uuid\|name>` | The test name or id. Repeat the flag for each test. |
-| `--build <path>`      | The build file to upload                            |
-| `--run`               | Run the tests after updating                        |
-| `--wait`              | Block until runs finish, exit non-zero on failure   |
-| `--token <token>`     | Overrides `TESTSNAG_TOKEN`                          |
-| `--url <url>`         | The TestSnag installation                           |
-| `--json`              | Machine readable output, implies non-interactive    |
+| Flag                | Meaning                                                       |
+| ------------------- | ------------------------------------------------------------- |
+| `--test <id\|name>` | The test id, or its full name. Repeat the flag for each test. |
+| `--build <path>`    | The build file to upload                                      |
+| `--run`             | Run the tests after updating                                  |
+| `--wait`            | Block until runs finish, exit non-zero on failure             |
+| `--token <token>`   | Overrides `TESTSNAG_TOKEN`                                    |
+| `--url <url>`       | The TestSnag installation                                     |
+| `--json`            | Machine readable output, implies non-interactive              |
 
 ## In CI
 

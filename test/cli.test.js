@@ -7,6 +7,13 @@ import {join} from 'node:path';
 import {parseArgs, isInteractive} from '../util/args.js';
 import {discoverBuilds, formatSize, platformForFile, rejectionReason, describeBuild} from '../util/builds.js';
 import {assertPlatformMatches, assertTestsAreMobile, assertToken, assertMobileAllowance} from '../util/validate.js';
+import {resolveRequestedTests} from '../commands/run.js';
+
+const TESTS = [
+    {uuid: 'aaa', name: 'Checkout, guest user', type: 'ios'},
+    {uuid: 'bbb', name: 'Checkout smoke', type: 'ios'},
+    {uuid: 'ccc', name: 'Checkout smoke', type: 'android'},
+];
 
 test('flags parse into camelCase, and repeated tests collect into a list', () => {
     const {command, flags} = parseArgs(['update', '--build', './a.apk', '--test', 'one', '--test', 'two', '--wait']);
@@ -105,4 +112,40 @@ test('an unlimited allowance passes', async () => {
     const unlimited = {me: async () => ({plan: 'advance', mobile_testing: true, mobile_minutes_used: 999, mobile_minutes_limit: null})};
 
     assert.equal((await assertMobileAllowance(unlimited)).plan, 'advance');
+});
+
+test('a name matches whatever its capitalisation and spacing', () => {
+    const [resolved] = resolveRequestedTests(['  checkout, GUEST user '], TESTS);
+
+    assert.equal(resolved.uuid, 'aaa');
+});
+
+test('an id always wins, even when a name would also match', () => {
+    const [resolved] = resolveRequestedTests(['bbb'], TESTS);
+
+    assert.equal(resolved.uuid, 'bbb');
+});
+
+test('an ambiguous name fails rather than silently running both', () => {
+    assert.throws(() => resolveRequestedTests(['Checkout smoke'], TESTS), /ambiguous/);
+});
+
+test('the ambiguity error names the ids to use instead', () => {
+    assert.throws(() => resolveRequestedTests(['Checkout smoke'], TESTS), /bbb, ccc/);
+});
+
+test('an unknown name suggests the closest ones', () => {
+    assert.throws(() => resolveRequestedTests(['Checkout'], TESTS), /Did you mean/);
+});
+
+test('an unknown name with nothing close just says so', () => {
+    assert.throws(() => resolveRequestedTests(['Nothing like this'], TESTS), /No test in this workspace matches/);
+});
+
+test('the same test asked for twice is only run once', () => {
+    assert.equal(resolveRequestedTests(['aaa', 'Checkout, guest user'], TESTS).length, 1);
+});
+
+test('a partial name is not accepted, so a typo cannot silently run the wrong test', () => {
+    assert.throws(() => resolveRequestedTests(['Checkout sm'], TESTS), /No test in this workspace matches/);
 });
