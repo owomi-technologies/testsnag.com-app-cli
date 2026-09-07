@@ -1,18 +1,37 @@
 {
   "name": "@testsnag/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Upload a mobile build, point tests at it, and run them.",
+  "keywords": [
+    "testsnag",
+    "testing",
+    "mobile",
+    "ios",
+    "android",
+    "e2e",
+    "ci"
+  ],
+  "homepage": "https://testsnag.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/owomi-technologies/testsnag.com-app-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/owomi-technologies/testsnag.com-app-cli/issues"
+  },
+  "license": "MIT",
   "type": "module",
   "bin": {
     "testsnag": "cli/testsnag.js"
   },
   "files": [
+    "LICENSE",
+    "README.md",
     "cli",
     "commands",
-    "prompts",
-    "util",
     "config.js",
-    "README.md"
+    "prompts",
+    "util"
   ],
   "engines": {
     "node": ">=20"
@@ -22,5 +41,7 @@
     "test": "node --test test/*.test.js",
     "format": "prettier --write ."
   },
-  "license": "UNLICENSED"
+  "publishConfig": {
+    "access": "public"
+  }
 }
