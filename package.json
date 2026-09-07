@@ -1,6 +1,6 @@
 {
   "name": "@testsnag/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Upload a mobile build, point tests at it, and run them.",
   "keywords": [
     "testsnag",
