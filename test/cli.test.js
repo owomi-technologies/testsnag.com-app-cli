@@ -9,12 +9,18 @@ import {discoverBuilds, formatSize, platformForFile, rejectionReason, describeBu
 import {assertPlatformMatches, assertTestsAreMobile, assertToken, assertMobileAllowance} from '../util/validate.js';
 
 test('flags parse into camelCase, and repeated tests collect into a list', () => {
-    const {command, flags} = parseArgs(['update', '--build', './a.apk', '--test', 'one', '--test', 'two,three', '--wait']);
+    const {command, flags} = parseArgs(['update', '--build', './a.apk', '--test', 'one', '--test', 'two', '--wait']);
 
     assert.equal(command, 'update');
     assert.equal(flags.build, './a.apk');
-    assert.deepEqual(flags.tests, ['one', 'two', 'three']);
+    assert.deepEqual(flags.tests, ['one', 'two']);
     assert.equal(flags.wait, true);
+});
+
+test('a test name containing a comma survives, because real names have commas', () => {
+    const {flags} = parseArgs(['run', '--test', 'Checkout, guest user']);
+
+    assert.deepEqual(flags.tests, ['Checkout, guest user']);
 });
 
 test('an inline flag value is accepted', () => {

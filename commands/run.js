@@ -1,6 +1,6 @@
 import {select, confirm} from '../prompts/index.js';
 import {assertTestsAreMobile} from '../util/validate.js';
-import {emit, failure, info, muted, success, warn} from '../util/output.js';
+import {emit, failure, info, muted, spinner, success, warn} from '../util/output.js';
 
 const POLL_INTERVAL_MS = 3000;
 const TERMINAL = new Set(['passed', 'failed', 'cancelled', 'skipped']);
@@ -41,13 +41,17 @@ export async function chooseTests(client, {flags, interactive, type = null, mess
     return data.filter((test) => chosen.includes(test.uuid));
 }
 
-export async function waitForRun(client, reference) {
+export async function waitForRun(client, reference, onTick) {
+    const startedAt = Date.now();
+
     for (;;) {
         const {data} = await client.run(reference);
 
         if (TERMINAL.has(data.status)) {
             return data;
         }
+
+        onTick?.(data, Math.round((Date.now() - startedAt) / 1000));
 
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
@@ -69,10 +73,19 @@ export async function runTests(client, tests, {wait}) {
         return 0;
     }
 
+    muted('Runs happen on our servers, so you can close this at any time and they will finish without you.');
+
     const results = [];
 
     for (const run of started) {
-        const finished = await waitForRun(client, run.reference);
+        const label = run.test ?? run.reference;
+        const progress = spinner(`Running ${label}`);
+        const finished = await waitForRun(client, run.reference, (data, seconds) => {
+            const steps = data.steps_total > 0 ? ` ${data.steps_passed + data.steps_failed}/${data.steps_total} steps` : '';
+            progress.update(`Running ${label}${steps} (${seconds}s)`);
+        });
+
+        progress.stop();
         results.push(finished);
 
         if (finished.status === 'passed') {

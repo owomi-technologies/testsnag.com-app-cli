@@ -6,10 +6,7 @@ import {emit, info, success} from '../util/output.js';
 export async function login({flags, interactive}) {
     const stored = await readConfig();
 
-    const baseUrl = (
-        flags.url ??
-        (interactive ? await ask('TestSnag URL', {defaultValue: stored.baseUrl ?? DEFAULT_BASE_URL}) : (stored.baseUrl ?? DEFAULT_BASE_URL))
-    ).replace(/\/+$/, '');
+    const baseUrl = (flags.url ?? process.env.TESTSNAG_URL ?? stored.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
 
     const token = flags.token ?? process.env.TESTSNAG_TOKEN ?? (interactive ? await ask('API token') : null);
 

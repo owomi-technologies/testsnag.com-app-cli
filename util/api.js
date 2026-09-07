@@ -45,23 +45,34 @@ export function createClient({baseUrl, token}) {
     };
 }
 
-export async function uploadBuild(uploadUrl, filePath, size, onProgress) {
+export async function uploadBuild(uploadUrl, filePath, size, onProgress, headers = {}) {
     const {createReadStream} = await import('node:fs');
-    const stream = createReadStream(filePath);
+    const {Readable} = await import('node:stream');
 
-    let sent = 0;
+    // Counting has to happen as fetch pulls the file. A 'data' listener would
+    // put the stream in flowing mode and consume bytes before they are sent.
+    async function* body() {
+        let sent = 0;
 
-    stream.on('data', (chunk) => {
-        sent += chunk.length;
-        onProgress?.(sent, size);
-    });
+        for await (const chunk of createReadStream(filePath)) {
+            sent += chunk.length;
+            onProgress?.(sent, size);
+            yield chunk;
+        }
+    }
 
-    const response = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: stream,
-        duplex: 'half',
-        headers: {'Content-Length': String(size)},
-    });
+    let response;
+
+    try {
+        response = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: Readable.from(body()),
+            duplex: 'half',
+            headers: {...headers, 'Content-Length': String(size)},
+        });
+    } catch (error) {
+        throw new ApiError(`The build could not be uploaded: ${error?.cause?.message ?? error.message}`, 0);
+    }
 
     if (!response.ok) {
         throw new ApiError(`The upload was rejected with status ${response.status}.`, response.status);

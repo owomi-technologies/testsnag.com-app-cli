@@ -79,6 +79,7 @@ async function main() {
 main()
     .then((code) => process.exit(code ?? 0))
     .catch((error) => {
-        failure(error?.message ?? 'Something went wrong.');
+        const cause = error?.cause?.message;
+        failure(cause && !String(error.message).includes(cause) ? `${error.message} (${cause})` : (error?.message ?? 'Something went wrong.'));
         process.exit(1);
     });

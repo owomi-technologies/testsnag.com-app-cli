@@ -3,7 +3,7 @@ import {ask, confirm, select} from '../prompts/index.js';
 import {chooseTests, runTests} from './run.js';
 import {assertPlatformMatches, assertTestsAreMobile} from '../util/validate.js';
 import {describeBuild, discoverBuilds, formatSize, platformForFile, rejectionReason} from '../util/builds.js';
-import {emit, failure, info, muted, success} from '../util/output.js';
+import {emit, failure, info, spinner, success} from '../util/output.js';
 
 const PUBLISH_POLL_MS = 3000;
 const PUBLISH_TIMEOUT_MS = 10 * 60 * 1000;
@@ -49,6 +49,7 @@ async function waitForPublish(client, tests) {
     const deadline = Date.now() + PUBLISH_TIMEOUT_MS;
     const pending = new Set(tests.map((test) => test.uuid));
     const failures = [];
+    const progress = spinner(`Publishing to ${pending.size} ${pending.size === 1 ? 'test' : 'tests'}`);
 
     while (pending.size > 0 && Date.now() < deadline) {
         const {data} = await client.tests();
@@ -60,18 +61,23 @@ async function waitForPublish(client, tests) {
 
             if (test.build?.status === 'ready') {
                 pending.delete(test.uuid);
+                progress.stop();
                 success(`${test.name} is ready`);
             } else if (test.build?.status === 'failed') {
                 pending.delete(test.uuid);
+                progress.stop();
                 failures.push(test.name);
                 failure(`${test.name} could not publish the build`);
             }
         }
 
         if (pending.size > 0) {
+            progress.update(`Publishing to ${pending.size} ${pending.size === 1 ? 'test' : 'tests'}`);
             await new Promise((resolve) => setTimeout(resolve, PUBLISH_POLL_MS));
         }
     }
+
+    progress.stop();
 
     if (pending.size > 0) {
         throw new Error('The build was still publishing after 10 minutes. Check the dashboard.');
@@ -109,14 +115,24 @@ export async function update({client, flags, interactive}) {
 
     let lastPercent = -1;
 
-    await uploadBuild(created.upload_url, build.path, build.size, (sent, total) => {
-        const percent = Math.floor((sent / total) * 100);
+    const uploading = spinner(`Uploading ${build.name} (${formatSize(build.size)})`);
 
-        if (percent !== lastPercent && percent % 5 === 0) {
-            lastPercent = percent;
-            muted(`uploading ${percent}%`);
-        }
-    });
+    await uploadBuild(
+        created.upload_url,
+        build.path,
+        build.size,
+        (sent, total) => {
+            const percent = Math.floor((sent / total) * 100);
+
+            if (percent !== lastPercent) {
+                lastPercent = percent;
+                uploading.update(`Uploading ${build.name} ${percent}% of ${formatSize(build.size)}`);
+            }
+        },
+        created.upload_headers ?? {},
+    );
+
+    uploading.stop();
 
     await client.completeBuild(created.id);
     success(`Uploaded ${build.name}`);
@@ -125,8 +141,6 @@ export async function update({client, flags, interactive}) {
         created.id,
         tests.map((test) => test.uuid),
     );
-    info(`Publishing to ${tests.length} ${tests.length === 1 ? 'test' : 'tests'}...`);
-
     await waitForPublish(client, tests);
 
     emit({build: {id: created.id, name: build.name}, tests: tests.map((test) => ({uuid: test.uuid, name: test.name}))});

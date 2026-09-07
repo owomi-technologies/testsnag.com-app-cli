@@ -18,11 +18,12 @@ export function parseArgs(argv) {
         const value = inlineValue ?? (next !== undefined && !next.startsWith('--') ? argv[++i] : true);
 
         if (LIST_FLAGS.has(rawName)) {
-            const values = String(value)
-                .split(',')
-                .map((entry) => entry.trim())
-                .filter(Boolean);
-            flags.tests = [...(flags.tests ?? []), ...values];
+            const entry = String(value).trim();
+
+            if (entry !== '') {
+                flags.tests = [...(flags.tests ?? []), entry];
+            }
+
             continue;
         }
 

@@ -39,3 +39,34 @@ export function failure(message) {
 export function emit(payload) {
     if (jsonMode) process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
 }
+
+const FRAMES = ['\u2839', '\u2838', '\u283c', '\u2834', '\u2826', '\u2827', '\u2807', '\u280f'];
+
+export function spinner(label) {
+    if (jsonMode || !process.stderr.isTTY) {
+        info(label);
+
+        return {update: () => {}, stop: () => {}};
+    }
+
+    let text = label;
+    let frame = 0;
+
+    const clear = () => process.stderr.write(`\r\u001b[2K`);
+    const timer = setInterval(() => {
+        clear();
+        process.stderr.write(`${paint('dim', FRAMES[frame++ % FRAMES.length])} ${text}`);
+    }, 90);
+
+    timer.unref?.();
+
+    return {
+        update(next) {
+            text = next;
+        },
+        stop() {
+            clearInterval(timer);
+            clear();
+        },
+    };
+}
