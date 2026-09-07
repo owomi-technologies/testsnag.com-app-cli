@@ -88,14 +88,21 @@ async function waitForPublish(client, tests) {
     }
 }
 
-export async function update({client, flags, interactive}) {
-    const build = await chooseBuild({flags, interactive});
-
-    if (build.platform === null) {
-        throw new Error(rejectionReason(build.name));
+async function chooseTestsOrSkip(client, build, {flags, interactive}) {
+    if (flags.noBind === true) {
+        return [];
     }
 
-    info(`${build.name} (${formatSize(build.size)}, ${build.platform})`);
+    if ((flags.tests ?? []).length === 0 && interactive) {
+        const intent = await select(`What should happen to ${build.name}?`, [
+            {value: 'bind', label: 'Bind it to tests', hint: 'publish it and run against it'},
+            {value: 'upload', label: 'Just upload it', hint: 'keep it in Files for later'},
+        ]);
+
+        if (intent === 'upload') {
+            return [];
+        }
+    }
 
     const tests = await chooseTests(client, {
         flags,
@@ -110,6 +117,20 @@ export async function update({client, flags, interactive}) {
 
     assertTestsAreMobile(tests);
     assertPlatformMatches(build.platform, tests);
+
+    return tests;
+}
+
+export async function update({client, flags, interactive}) {
+    const build = await chooseBuild({flags, interactive});
+
+    if (build.platform === null) {
+        throw new Error(rejectionReason(build.name));
+    }
+
+    info(`${build.name} (${formatSize(build.size)}, ${build.platform})`);
+
+    const tests = await chooseTestsOrSkip(client, build, {flags, interactive});
 
     const {data: created} = await client.createBuild(build.name, build.platform, build.size);
 
@@ -136,6 +157,13 @@ export async function update({client, flags, interactive}) {
 
     await client.completeBuild(created.id);
     success(`Uploaded ${build.name}`);
+
+    if (tests.length === 0) {
+        info('Not bound to any test. It is in your Files library, ready to bind whenever you want.');
+        emit({build: {id: created.id, name: build.name}, tests: []});
+
+        return 0;
+    }
 
     await client.bindBuild(
         created.id,

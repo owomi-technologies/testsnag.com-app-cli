@@ -17,8 +17,9 @@ const USAGE = `testsnag - run mobile tests against a new build
   npx @testsnag/cli update          upload a build, bind it to tests, run them
 
 Options
-  --test <uuid|name>   repeatable, or comma separated
+  --test <id|name>     the test id or full name, repeat once per test
   --build <path>       the build file to upload
+  --no-bind            upload the build only, without attaching it to a test
   --run                run the tests after updating
   --wait               block until runs finish, and exit non-zero on failure
   --token <token>      overrides TESTSNAG_TOKEN

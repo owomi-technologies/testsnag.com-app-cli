@@ -60,6 +60,9 @@ Android takes an `.apk` or `.apks`. An `.aab` is refused; convert it with `bundl
 
 Interactively, the CLI lists build artifacts it finds in the working directory and the usual output directories, newest first.
 
+To upload a build without pointing any test at it, choose **Just upload it** when asked, or pass `--no-bind`. The file lands in
+your Files library, ready to bind later.
+
 ## Development
 
 ```bash
