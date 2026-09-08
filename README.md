@@ -53,10 +53,11 @@ The exit code is non-zero when a run fails, so the pipeline stops.
 
 ## Builds
 
-iOS takes a zipped simulator build (`.zip`, `.tar.gz`, `.tgz`), produced with `xcodebuild -sdk iphonesimulator`. An `.ipa` is a
-device build and is refused.
+iOS takes a zipped simulator build (`.zip`, `.tar.gz`, `.tgz`), produced with `xcodebuild -sdk iphonesimulator`. Android takes an
+`.apk` or `.apks`.
 
-Android takes an `.apk` or `.apks`. An `.aab` is refused; convert it with `bundletool build-apks --mode=universal` first.
+An `.ipa` or an `.aab` can be uploaded and stored, but not bound to a test: an `.ipa` is built for device hardware and a simulator
+cannot run it, and an `.aab` is not installable until `bundletool build-apks --mode=universal` converts it.
 
 Interactively, the CLI lists build artifacts it finds in the working directory and the usual output directories, newest first.
 

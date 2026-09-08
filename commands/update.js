@@ -2,7 +2,7 @@ import {uploadBuild} from '../util/api.js';
 import {ask, confirm, select} from '../prompts/index.js';
 import {chooseTests, runTests} from './run.js';
 import {assertPlatformMatches, assertTestsAreMobile} from '../util/validate.js';
-import {describeBuild, discoverBuilds, formatSize, platformForFile, rejectionReason} from '../util/builds.js';
+import {describeBuild, discoverBuilds, formatSize, rejectionReason} from '../util/builds.js';
 import {emit, failure, info, spinner, success} from '../util/output.js';
 
 const PUBLISH_POLL_MS = 3000;
@@ -33,7 +33,7 @@ async function chooseBuild({flags, interactive}) {
         ...discovered.map((build) => ({
             value: build.path,
             label: build.name,
-            hint: `${build.platform} · ${formatSize(build.size)}`,
+            hint: `${build.platform ?? 'unknown'}${build.runnable ? '' : ', upload only'} · ${formatSize(build.size)}`,
         })),
         {value: '', label: 'Enter a path instead', hint: ''},
     ]);
@@ -88,22 +88,31 @@ async function waitForPublish(client, tests) {
     }
 }
 
-async function chooseTestsOrSkip(client, build, {flags, interactive}) {
+async function wantsToBind(build, {flags, interactive}) {
     if (flags.noBind === true) {
-        return [];
+        return false;
     }
 
-    if ((flags.tests ?? []).length === 0 && interactive) {
-        const intent = await select(`What should happen to ${build.name}?`, [
-            {value: 'bind', label: 'Bind it to tests', hint: 'publish it and run against it'},
-            {value: 'upload', label: 'Just upload it', hint: 'keep it in Files for later'},
-        ]);
-
-        if (intent === 'upload') {
-            return [];
-        }
+    if ((flags.tests ?? []).length > 0 || !interactive) {
+        return true;
     }
 
+    const choices = [
+        {value: 'bind', label: 'Bind it to tests', hint: 'publish it and run against it'},
+        {value: 'upload', label: 'Just upload it', hint: 'keep it in Files for later'},
+    ];
+
+    if (!build.runnable) {
+        info(`${build.name} cannot be run on a device, so it can only be uploaded.`);
+        info(rejectionReason(build.name));
+
+        return false;
+    }
+
+    return (await select(`What should happen to ${build.name}?`, choices)) === 'bind';
+}
+
+async function chooseTestsToBind(client, build, {flags, interactive}) {
     const tests = await chooseTests(client, {
         flags,
         interactive,
@@ -124,13 +133,15 @@ async function chooseTestsOrSkip(client, build, {flags, interactive}) {
 export async function update({client, flags, interactive}) {
     const build = await chooseBuild({flags, interactive});
 
-    if (build.platform === null) {
+    info(`${build.name} (${formatSize(build.size)}, ${build.platform ?? 'unknown platform'}${build.runnable ? '' : ', upload only'})`);
+
+    const binding = await wantsToBind(build, {flags, interactive});
+
+    if (binding && !build.runnable) {
         throw new Error(rejectionReason(build.name));
     }
 
-    info(`${build.name} (${formatSize(build.size)}, ${build.platform})`);
-
-    const tests = await chooseTestsOrSkip(client, build, {flags, interactive});
+    const tests = binding ? await chooseTestsToBind(client, build, {flags, interactive}) : [];
 
     const {data: created} = await client.createBuild(build.name, build.platform, build.size);
 

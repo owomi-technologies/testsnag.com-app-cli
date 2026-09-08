@@ -1,23 +1,31 @@
 import {stat, readdir} from 'node:fs/promises';
 import {basename, extname, join, resolve} from 'node:path';
 
-export const PLATFORM_EXTENSIONS = {
-    ios: ['.zip', '.tar.gz', '.tgz'],
-    android: ['.apk', '.apks'],
+export const BUILD_TYPES = {
+    '.zip': {platform: 'ios', runnable: true},
+    '.tar.gz': {platform: 'ios', runnable: true},
+    '.tgz': {platform: 'ios', runnable: true},
+    '.ipa': {platform: 'ios', runnable: false},
+    '.apk': {platform: 'android', runnable: true},
+    '.apks': {platform: 'android', runnable: true},
+    '.aab': {platform: 'android', runnable: false},
 };
 
 const SEARCH_DIRECTORIES = ['.', 'build', 'dist', 'ios/build', 'android/app/build/outputs/apk', 'android/app/build/outputs/apk/release'];
 
-export function platformForFile(name) {
+export function buildType(name) {
     const lower = name.toLowerCase();
+    const extension = Object.keys(BUILD_TYPES).find((candidate) => lower.endsWith(candidate));
 
-    for (const [platform, extensions] of Object.entries(PLATFORM_EXTENSIONS)) {
-        if (extensions.some((extension) => lower.endsWith(extension))) {
-            return platform;
-        }
-    }
+    return extension === undefined ? null : BUILD_TYPES[extension];
+}
 
-    return null;
+export function platformForFile(name) {
+    return buildType(name)?.platform ?? null;
+}
+
+export function isRunnable(name) {
+    return buildType(name)?.runnable === true;
 }
 
 export function rejectionReason(name) {
@@ -49,7 +57,7 @@ export async function discoverBuilds(cwd = process.cwd()) {
         }
 
         for (const entry of entries) {
-            if (!entry.isFile() || platformForFile(entry.name) === null) {
+            if (!entry.isFile() || buildType(entry.name) === null) {
                 continue;
             }
 
@@ -61,7 +69,14 @@ export async function discoverBuilds(cwd = process.cwd()) {
 
             try {
                 const info = await stat(path);
-                found.set(path, {path, name: entry.name, size: info.size, modifiedAt: info.mtimeMs, platform: platformForFile(entry.name)});
+                found.set(path, {
+                    path,
+                    name: entry.name,
+                    size: info.size,
+                    modifiedAt: info.mtimeMs,
+                    platform: platformForFile(entry.name),
+                    runnable: isRunnable(entry.name),
+                });
             } catch {
                 continue;
             }
@@ -83,7 +98,14 @@ export async function describeBuild(path) {
         throw new Error(`${absolute} is empty.`);
     }
 
-    return {path: absolute, name: basename(absolute), size: info.size, platform: platformForFile(absolute), extension: extname(absolute)};
+    return {
+        path: absolute,
+        name: basename(absolute),
+        size: info.size,
+        platform: platformForFile(absolute),
+        runnable: isRunnable(absolute),
+        extension: extname(absolute),
+    };
 }
 
 export function formatSize(bytes) {

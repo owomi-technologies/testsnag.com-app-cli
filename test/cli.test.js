@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 import {parseArgs, isInteractive} from '../util/args.js';
-import {discoverBuilds, formatSize, platformForFile, rejectionReason, describeBuild} from '../util/builds.js';
+import {discoverBuilds, formatSize, isRunnable, platformForFile, rejectionReason, describeBuild} from '../util/builds.js';
 import {assertPlatformMatches, assertTestsAreMobile, assertToken, assertMobileAllowance} from '../util/validate.js';
 import {resolveRequestedTests} from '../commands/run.js';
 
@@ -45,7 +45,7 @@ test('platform is resolved from the extension', () => {
     assert.equal(platformForFile('Acme.apks'), 'android');
     assert.equal(platformForFile('Acme.zip'), 'ios');
     assert.equal(platformForFile('Acme.tar.gz'), 'ios');
-    assert.equal(platformForFile('Acme.ipa'), null);
+    assert.equal(platformForFile('Acme.txt'), null);
 });
 
 test('an ipa is rejected with the command that produces a simulator build', () => {
@@ -148,4 +148,32 @@ test('the same test asked for twice is only run once', () => {
 
 test('a partial name is not accepted, so a typo cannot silently run the wrong test', () => {
     assert.throws(() => resolveRequestedTests(['Checkout sm'], TESTS), /No test in this workspace matches/);
+});
+
+test('an ipa is an iOS package that cannot be run, so it keeps its platform', () => {
+    assert.equal(platformForFile('Acme.ipa'), 'ios');
+    assert.equal(isRunnable('Acme.ipa'), false);
+});
+
+test('an aab is an Android package that cannot be run', () => {
+    assert.equal(platformForFile('Acme.aab'), 'android');
+    assert.equal(isRunnable('Acme.aab'), false);
+});
+
+test('a simulator build and an apk are runnable', () => {
+    assert.equal(isRunnable('Acme.zip'), true);
+    assert.equal(isRunnable('Acme.apk'), true);
+});
+
+test('upload only builds are discovered, so they can be stored without binding', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'testsnag-cli-'));
+    await writeFile(join(root, 'Acme.ipa'), 'x');
+    await writeFile(join(root, 'Acme.apk'), 'y');
+
+    const found = await discoverBuilds(root);
+    const ipa = found.find((build) => build.name === 'Acme.ipa');
+
+    assert.equal(found.length, 2);
+    assert.equal(ipa.platform, 'ios');
+    assert.equal(ipa.runnable, false);
 });
