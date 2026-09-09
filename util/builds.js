@@ -11,7 +11,20 @@ export const BUILD_TYPES = {
     '.aab': {platform: 'android', runnable: false},
 };
 
-const SEARCH_DIRECTORIES = ['.', 'build', 'dist', 'ios/build', 'android/app/build/outputs/apk', 'android/app/build/outputs/apk/release'];
+const SEARCH_DIRECTORIES = [
+    '.',
+    'build',
+    'dist',
+    'ios/build',
+    'ios/build/Build/Products/Debug-iphonesimulator',
+    'ios/build/Build/Products/Release-iphonesimulator',
+    'build/ios/iphonesimulator',
+    'android/app/build/outputs/apk',
+    'android/app/build/outputs/apk/debug',
+    'android/app/build/outputs/apk/release',
+    'android/app/build/outputs/bundle/release',
+    'build/app/outputs/flutter-apk',
+];
 
 export function buildType(name) {
     const lower = name.toLowerCase();

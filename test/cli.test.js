@@ -177,3 +177,25 @@ test('upload only builds are discovered, so they can be stored without binding',
     assert.equal(ipa.platform, 'ios');
     assert.equal(ipa.runnable, false);
 });
+
+test('a flutter apk is discovered where flutter actually writes it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'testsnag-cli-'));
+    await mkdir(join(root, 'build/app/outputs/flutter-apk'), {recursive: true});
+    await writeFile(join(root, 'build/app/outputs/flutter-apk/app-release.apk'), 'x');
+
+    const found = await discoverBuilds(root);
+
+    assert.equal(found.length, 1);
+    assert.equal(found[0].name, 'app-release.apk');
+});
+
+test('a react native simulator build is discovered once zipped', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'testsnag-cli-'));
+    await mkdir(join(root, 'ios/build/Build/Products/Debug-iphonesimulator'), {recursive: true});
+    await writeFile(join(root, 'ios/build/Build/Products/Debug-iphonesimulator/App.zip'), 'x');
+
+    const found = await discoverBuilds(root);
+
+    assert.equal(found.length, 1);
+    assert.equal(found[0].platform, 'ios');
+});

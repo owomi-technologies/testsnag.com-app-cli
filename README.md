@@ -59,7 +59,9 @@ iOS takes a zipped simulator build (`.zip`, `.tar.gz`, `.tgz`), produced with `x
 An `.ipa` or an `.aab` can be uploaded and stored, but not bound to a test: an `.ipa` is built for device hardware and a simulator
 cannot run it, and an `.aab` is not installable until `bundletool build-apks --mode=universal` converts it.
 
-Interactively, the CLI lists build artifacts it finds in the working directory and the usual output directories, newest first.
+Interactively, the CLI lists build artifacts it finds in the working directory and the usual output directories, newest first. That
+covers Gradle and Xcode as well as Flutter (`build/app/outputs/flutter-apk`, `build/ios/iphonesimulator`) and React Native
+(`ios/build/Build/Products/Debug-iphonesimulator`).
 
 To upload a build without pointing any test at it, choose **Just upload it** when asked, or pass `--no-bind`. The file lands in
 your Files library, ready to bind later.
